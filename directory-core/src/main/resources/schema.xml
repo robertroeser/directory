@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<sbe:messageSchema xmlns:sbe="http://www.fixprotocol.org/ns/simple/1.0"
+                   package="netflix.directory.core.protocol"
+                   id="1"
+                   version="0"
+                   semanticVersion="1.0"
+                   description="Directory Message Format"
+                   byteOrder="littleEndian">
+    <types>
+        <composite name="messageHeader" description="Message identifiers and length of message root">
+            <type name="blockLength" primitiveType="uint16"/>
+            <type name="templateId" primitiveType="uint16"/>
+            <type name="schemaId" primitiveType="uint16"/>
+            <type name="version" primitiveType="uint16"/>
+        </composite>
+        <enum name="BooleanType" encodingType="uint8">
+            <validValue name="FALSE">0</validValue>
+            <validValue name="TRUE">1</validValue>
+        </enum>
+        <enum name="RequestType" encodingType="uint8">
+            <validValue name="GET">0</validValue>
+            <validValue name="PUT">1</validValue>
+            <validValue name="DELETE">2</validValue>
+        </enum>
+        <enum name="ResponseCode" encodingType="uint8">
+            <validValue name="SUCCESS">0</validValue>
+            <validValue name="ERROR">1</validValue>
+        </enum>
+        <composite name="varDataEncoding">
+            <type name="length" primitiveType="uint8" semanticType="Length"/>
+            <type name="varData" primitiveType="uint8" length="0" characterEncoding="UTF-8" semanticType="data"/>
+        </composite>
+    </types>
+    <sbe:message name="RequestMessage" id="1" description="Our message payload">
+        <field name="type" id="1" type="RequestType"/>
+        <data name="key" id="2" type="varDataEncoding" />
+        <data name="value" id="3" type="varDataEncoding" />
+        <data name="responseChannel" id="4" type="varDataEncoding" />
+    </sbe:message>
+    <sbe:message name="ResponseMessage" id="2" description="Our message payload">
+        <field name="code" id="1" type="ResponseCode"/>
+        <data name="key" id="2" type="varDataEncoding" />
+        <data name="value" id="3" type="varDataEncoding" />
+    </sbe:message>
+</sbe:messageSchema>

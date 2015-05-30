@@ -1,0 +1,99 @@
+buildscript {
+    repositories {
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
+    }
+
+    dependencies {
+        classpath "com.github.jengelman.gradle.plugins:shadow:1.2.1"
+        classpath "com.netflix.nebula:gradle-stash-plugin:${nebulaGradleVersion}.+"
+        classpath "com.netflix.nebula:gradle-override-plugin:${nebulaGradleVersion}.+"
+    }
+}
+
+allprojects {
+    apply plugin: 'nebula'
+    apply plugin: 'nebula-ospackage'
+    apply plugin: 'application'
+    apply plugin: 'java'
+    apply plugin: 'eclipse'
+    apply plugin: 'idea'
+    apply plugin: 'platform-java8-fix'
+    apply plugin: 'com.github.johnrengelman.shadow'
+
+    repositories {
+        mavenCentral()
+        mavenLocal()
+    }
+
+    nebula {
+        readyForJava8 = true
+        moduleOwner = 'edge-services@netflix.com'
+    }
+
+}
+
+subprojects {
+
+    dependencies {
+        testCompile 'junit:junit:4.+'
+    }
+}
+
+project (':directory-core') {
+    dependencies {
+        compile 'uk.co.real-logic:sbe:1.1-RC2-SNAPSHOT'
+        compile 'uk.co.real-logic:Agrona:0.3.2-SNAPSHOT'
+    }
+
+    // ./gradlew generateStubs
+    task generateStubs(type:JavaExec) {
+        description = "Generate SBE codecs into ${project.projectDir}/src/main/java/pubsub/schema"
+        main = 'uk.co.real_logic.sbe.SbeTool'
+        classpath = sourceSets.main.compileClasspath
+        systemProperties(
+                'sbe.output.dir': "${project.projectDir}/src/main/java",
+                'sbe.target.language': 'Java',
+                'sbe.validation.stop.on.error': 'true')
+        args "${project.projectDir}/src/main/resources/schema.xml"
+    }
+
+}
+
+project (':directory-server') {
+    dependencies {
+        compile project (':directory-core')
+        compile 'netflix:nflx-datastax-driver:1.0'
+        compile 'org.mapdb:mapdb:1.0.7'
+        compile 'io.reactivex:rxjava:1.0.8'
+        compile 'io.reactivex:rxnetty:0.4.9'
+        compile 'uk.co.real-logic:aeron-client:0.1-SNAPSHOT'
+        compile 'uk.co.real-logic:aeron-driver:0.1-SNAPSHOT'
+        compile 'uk.co.real-logic:aeron-tools:0.1-SNAPSHOT'
+    }
+
+    task runServer(type:JavaExec) {
+        description = "Run the Directory Server"
+        main = 'netflix.directory.server.Directory'
+        classpath = sourceSets.main.runtimeClasspath
+    }
+}
+
+project (':directory-client') {
+    dependencies {
+        compile project (':directory-core')
+        compile 'io.reactivex:rxjava:1.0.8'
+        compile 'io.reactivex:rxnetty:0.4.9'
+        compile 'uk.co.real-logic:aeron-client:0.1-SNAPSHOT'
+        compile 'uk.co.real-logic:aeron-driver:0.1-SNAPSHOT'
+        compile 'uk.co.real-logic:aeron-tools:0.1-SNAPSHOT'
+    }
+
+    task runClient(type:JavaExec) {
+        description = "Run the Directory Client"
+        main = 'netflix.directory.client.DirectoryClient'
+        classpath = sourceSets.main.runtimeClasspath
+    }
+
+}
