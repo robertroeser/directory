@@ -75,7 +75,7 @@ project (':directory-server') {
 
     task runServer(type:JavaExec) {
         description = "Run the Directory Server"
-        main = 'netflix.directory.server.Directory'
+        main = 'netflix.directory.server.DirectoryAeron'
         classpath = sourceSets.main.runtimeClasspath
     }
 }
@@ -92,7 +92,7 @@ project (':directory-client') {
 
     task runClient(type:JavaExec) {
         description = "Run the Directory Client"
-        main = 'netflix.directory.client.DirectoryClient'
+        main = 'netflix.directory.client.DirectoryAeronClient'
         classpath = sourceSets.main.runtimeClasspath
     }
 
