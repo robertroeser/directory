@@ -2,11 +2,8 @@ package netflix.directory.client;
 
 import netflix.directory.core.protocol.MessageHeaderDecoder;
 import netflix.directory.core.protocol.MessageHeaderEncoder;
-import netflix.directory.core.protocol.RequestMessageEncoder;
-import netflix.directory.core.protocol.RequestType;
-import netflix.directory.core.protocol.ResponseMessageDecoder;
-import netflix.directory.core.serialization.RequestMessageWriter;
-import netflix.directory.core.serialization.ResponseMessageReader;
+import netflix.directory.core.protocol.PutEncoder;
+import netflix.directory.core.protocol.ResponseDecoder;
 import rx.Observable;
 import uk.co.real_logic.aeron.Aeron;
 import uk.co.real_logic.aeron.Publication;
@@ -46,6 +43,8 @@ public class DirectoryAeronClient {
         final Aeron.Context context = new Aeron.Context();
         final Aeron aeron = Aeron.connect(context);
 
+        final MessageHeaderEncoder messageHeaderEncoder = new MessageHeaderEncoder();
+        final PutEncoder putEncoder = new PutEncoder();
 
         final UnsafeBuffer unsafeBuffer = new UnsafeBuffer(ByteBuffer.allocateDirect(MAX_BUFFER_LENGTH));
 
@@ -54,7 +53,7 @@ public class DirectoryAeronClient {
                 MessageHeaderDecoder messageHeaderDecoder = new MessageHeaderDecoder();
                 messageHeaderDecoder.wrap(buffer, offset, MESSAGE_TEMPLATE_VERSION);
 
-                ResponseMessageDecoder responseMessageDecoder = new ResponseMessageDecoder();
+                ResponseDecoder responseMessageDecoder = new ResponseDecoder();
                 responseMessageDecoder.wrap(buffer, offset + messageHeaderDecoder.size(), messageHeaderDecoder.blockLength(), MESSAGE_TEMPLATE_VERSION);
 
                 System.out.println("ResponseMessage =" + responseMessageDecoder.value() + ", key= " + responseMessageDecoder.key());
@@ -77,27 +76,20 @@ public class DirectoryAeronClient {
             .doOnNext(i -> {
                 System.out.println("Sending message a_key" + i);
 
-                //RequestMessageWriter rmw = RequestMessageWriter.getInstance();
-                //rmw.encode(RequestType.PUT, "a_key" + i, String.valueOf(System.nanoTime()), RESPONSE_CHANNEL);
-
-                MessageHeaderEncoder messageHeaderEncoder = new MessageHeaderEncoder();
                 messageHeaderEncoder.wrap(unsafeBuffer, 0, MESSAGE_TEMPLATE_VERSION);
-
-                RequestMessageEncoder requestMessageEncoder = new RequestMessageEncoder();
-                requestMessageEncoder.wrap(unsafeBuffer, messageHeaderEncoder.size());
+                putEncoder.wrap(unsafeBuffer, messageHeaderEncoder.size());
 
                 messageHeaderEncoder
-                    .blockLength(RequestMessageEncoder.BLOCK_LENGTH)
-                    .templateId(RequestMessageEncoder.TEMPLATE_ID)
-                    .schemaId(RequestMessageEncoder.SCHEMA_ID)
-                    .version(RequestMessageEncoder.SCHEMA_VERSION);
+                    .blockLength(PutEncoder.BLOCK_LENGTH)
+                    .templateId(PutEncoder.TEMPLATE_ID)
+                    .schemaId(PutEncoder.SCHEMA_ID)
+                    .version(PutEncoder.SCHEMA_VERSION);
 
-                requestMessageEncoder.responseChannel(RESPONSE_CHANNEL);
-                requestMessageEncoder.key("a_key" + i);
-                requestMessageEncoder.value(String.valueOf(System.nanoTime()));
-                requestMessageEncoder.type(RequestType.PUT);
+                putEncoder.responseChannel(RESPONSE_CHANNEL);
+                putEncoder.key("a_key" + i);
+                putEncoder.value(String.valueOf(System.nanoTime()));
 
-                final int length = messageHeaderEncoder.size() + requestMessageEncoder.size();
+                final int length = messageHeaderEncoder.size() + putEncoder.size();
 
                 while (serverPublication.offer(unsafeBuffer, 0, length) < 0) {
 
@@ -107,19 +99,3 @@ public class DirectoryAeronClient {
             .last();
     }
 }
-
-                /*
-                messageHeaderEncoder.wrap(buffer, 0, MESSAGE_TEMPLATE_VERSION);
-        bidEncoder.wrap(buffer, messageHeaderEncoder.size());
-
-        messageHeaderEncoder
-            .blockLength(BidEncoder.BLOCK_LENGTH)
-            .templateId(BidEncoder.TEMPLATE_ID)
-            .schemaId(BidEncoder.SCHEMA_ID)
-            .version(BidEncoder.SCHEMA_VERSION);
-
-        bidEncoder
-            .auctionId(auctionId)
-            .bidderId(bidderId)
-            .value(value);
-                 */

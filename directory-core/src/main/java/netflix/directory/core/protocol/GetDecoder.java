@@ -4,14 +4,14 @@ package netflix.directory.core.protocol;
 import uk.co.real_logic.sbe.codec.java.*;
 import uk.co.real_logic.agrona.DirectBuffer;
 
-public class ResponseMessageDecoder
+public class GetDecoder
 {
-    public static final int BLOCK_LENGTH = 1;
-    public static final int TEMPLATE_ID = 2;
+    public static final int BLOCK_LENGTH = 0;
+    public static final int TEMPLATE_ID = 3;
     public static final int SCHEMA_ID = 1;
     public static final int SCHEMA_VERSION = 0;
 
-    private final ResponseMessageDecoder parentMessage = this;
+    private final GetDecoder parentMessage = this;
     private DirectBuffer buffer;
     protected int offset;
     protected int limit;
@@ -48,7 +48,7 @@ public class ResponseMessageDecoder
         return offset;
     }
 
-    public ResponseMessageDecoder wrap(
+    public GetDecoder wrap(
         final DirectBuffer buffer, final int offset, final int actingBlockLength, final int actingVersion)
     {
         this.buffer = buffer;
@@ -76,32 +76,9 @@ public class ResponseMessageDecoder
         this.limit = limit;
     }
 
-    public static int codeId()
-    {
-        return 1;
-    }
-
-    public static String codeMetaAttribute(final MetaAttribute metaAttribute)
-    {
-        switch (metaAttribute)
-        {
-            case EPOCH: return "unix";
-            case TIME_UNIT: return "nanosecond";
-            case SEMANTIC_TYPE: return "";
-        }
-
-        return "";
-    }
-
-    public ResponseCode code()
-    {
-        return ResponseCode.get(CodecUtil.uint8Get(buffer, offset + 0));
-    }
-
-
     public static int keyId()
     {
-        return 2;
+        return 1;
     }
 
     public static String keyCharacterEncoding()
@@ -184,17 +161,17 @@ public class ResponseMessageDecoder
         return value;
     }
 
-    public static int valueId()
+    public static int responseChannelId()
     {
-        return 3;
+        return 2;
     }
 
-    public static String valueCharacterEncoding()
+    public static String responseChannelCharacterEncoding()
     {
         return "UTF-8";
     }
 
-    public static String valueMetaAttribute(final MetaAttribute metaAttribute)
+    public static String responseChannelMetaAttribute(final MetaAttribute metaAttribute)
     {
         switch (metaAttribute)
         {
@@ -206,12 +183,12 @@ public class ResponseMessageDecoder
         return "";
     }
 
-    public static int valueHeaderSize()
+    public static int responseChannelHeaderSize()
     {
         return 1;
     }
 
-    public int valueLength()
+    public int responseChannelLength()
     {
         final int sizeOfLengthField = 1;
         final int limit = limit();
@@ -220,7 +197,7 @@ public class ResponseMessageDecoder
         return CodecUtil.uint8Get(buffer, limit);
     }
 
-    public int getValue(final uk.co.real_logic.agrona.MutableDirectBuffer dst, final int dstOffset, final int length)
+    public int getResponseChannel(final uk.co.real_logic.agrona.MutableDirectBuffer dst, final int dstOffset, final int length)
     {
         final int sizeOfLengthField = 1;
         final int limit = limit();
@@ -233,7 +210,7 @@ public class ResponseMessageDecoder
         return bytesCopied;
     }
 
-    public int getValue(final byte[] dst, final int dstOffset, final int length)
+    public int getResponseChannel(final byte[] dst, final int dstOffset, final int length)
     {
         final int sizeOfLengthField = 1;
         final int limit = limit();
@@ -246,7 +223,7 @@ public class ResponseMessageDecoder
         return bytesCopied;
     }
 
-    public String value()
+    public String responseChannel()
     {
         final int sizeOfLengthField = 1;
         final int limit = limit();

@@ -4,14 +4,14 @@ package netflix.directory.core.protocol;
 import uk.co.real_logic.sbe.codec.java.*;
 import uk.co.real_logic.agrona.MutableDirectBuffer;
 
-public class ResponseMessageEncoder
+public class PutEncoder
 {
-    public static final int BLOCK_LENGTH = 1;
+    public static final int BLOCK_LENGTH = 0;
     public static final int TEMPLATE_ID = 2;
     public static final int SCHEMA_ID = 1;
     public static final int SCHEMA_VERSION = 0;
 
-    private final ResponseMessageEncoder parentMessage = this;
+    private final PutEncoder parentMessage = this;
     private MutableDirectBuffer buffer;
     protected int offset;
     protected int limit;
@@ -48,7 +48,7 @@ public class ResponseMessageEncoder
         return offset;
     }
 
-    public ResponseMessageEncoder wrap(final MutableDirectBuffer buffer, final int offset)
+    public PutEncoder wrap(final MutableDirectBuffer buffer, final int offset)
     {
         this.buffer = buffer;
         this.offset = offset;
@@ -71,15 +71,10 @@ public class ResponseMessageEncoder
         buffer.checkLimit(limit);
         this.limit = limit;
     }
-    public ResponseMessageEncoder code(final ResponseCode value)
-    {
-        CodecUtil.uint8Put(buffer, offset + 0, value.value());
-        return this;
-    }
 
     public static int keyId()
     {
-        return 2;
+        return 1;
     }
 
     public static String keyCharacterEncoding()
@@ -143,7 +138,7 @@ public class ResponseMessageEncoder
 
     public static int valueId()
     {
-        return 3;
+        return 2;
     }
 
     public static String valueCharacterEncoding()
@@ -186,6 +181,70 @@ public class ResponseMessageEncoder
     }
 
     public void value(final String value)
+    {
+        final byte[] bytes;
+        try
+        {
+            bytes = value.getBytes("UTF-8");
+        }
+        catch (final java.io.UnsupportedEncodingException ex)
+        {
+            throw new RuntimeException(ex);
+        }
+
+        final int length = bytes.length;
+        final int sizeOfLengthField = 1;
+        final int limit = limit();
+        limit(limit + sizeOfLengthField + length);
+        CodecUtil.uint8Put(buffer, limit, (short)length);
+        buffer.putBytes(limit + sizeOfLengthField, bytes, 0, length);
+    }
+
+    public static int responseChannelId()
+    {
+        return 3;
+    }
+
+    public static String responseChannelCharacterEncoding()
+    {
+        return "UTF-8";
+    }
+
+    public static String responseChannelMetaAttribute(final MetaAttribute metaAttribute)
+    {
+        switch (metaAttribute)
+        {
+            case EPOCH: return "unix";
+            case TIME_UNIT: return "nanosecond";
+            case SEMANTIC_TYPE: return "";
+        }
+
+        return "";
+    }
+
+    public int putResponseChannel(final uk.co.real_logic.agrona.DirectBuffer src, final int srcOffset, final int length)
+    {
+        final int sizeOfLengthField = 1;
+        final int limit = limit();
+        limit(limit + sizeOfLengthField + length);
+        CodecUtil.uint8Put(buffer, limit, (short)length);
+        buffer.putBytes(limit + sizeOfLengthField, src, srcOffset, length);
+
+        return length;
+    }
+
+    public int putResponseChannel(final byte[] src, final int srcOffset, final int length)
+    {
+        final int sizeOfLengthField = 1;
+        final int limit = limit();
+        limit(limit + sizeOfLengthField + length);
+        CodecUtil.uint8Put(buffer, limit, (short)length);
+        buffer.putBytes(limit + sizeOfLengthField, src, srcOffset, length);
+
+        return length;
+    }
+
+    public void responseChannel(final String value)
     {
         final byte[] bytes;
         try

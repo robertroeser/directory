@@ -4,14 +4,14 @@ package netflix.directory.core.protocol;
 import uk.co.real_logic.sbe.codec.java.*;
 import uk.co.real_logic.agrona.DirectBuffer;
 
-public class RequestMessageDecoder
+public class PutDecoder
 {
-    public static final int BLOCK_LENGTH = 1;
-    public static final int TEMPLATE_ID = 1;
+    public static final int BLOCK_LENGTH = 0;
+    public static final int TEMPLATE_ID = 2;
     public static final int SCHEMA_ID = 1;
     public static final int SCHEMA_VERSION = 0;
 
-    private final RequestMessageDecoder parentMessage = this;
+    private final PutDecoder parentMessage = this;
     private DirectBuffer buffer;
     protected int offset;
     protected int limit;
@@ -48,7 +48,7 @@ public class RequestMessageDecoder
         return offset;
     }
 
-    public RequestMessageDecoder wrap(
+    public PutDecoder wrap(
         final DirectBuffer buffer, final int offset, final int actingBlockLength, final int actingVersion)
     {
         this.buffer = buffer;
@@ -76,32 +76,9 @@ public class RequestMessageDecoder
         this.limit = limit;
     }
 
-    public static int typeId()
-    {
-        return 1;
-    }
-
-    public static String typeMetaAttribute(final MetaAttribute metaAttribute)
-    {
-        switch (metaAttribute)
-        {
-            case EPOCH: return "unix";
-            case TIME_UNIT: return "nanosecond";
-            case SEMANTIC_TYPE: return "";
-        }
-
-        return "";
-    }
-
-    public RequestType type()
-    {
-        return RequestType.get(CodecUtil.uint8Get(buffer, offset + 0));
-    }
-
-
     public static int keyId()
     {
-        return 2;
+        return 1;
     }
 
     public static String keyCharacterEncoding()
@@ -186,7 +163,7 @@ public class RequestMessageDecoder
 
     public static int valueId()
     {
-        return 3;
+        return 2;
     }
 
     public static String valueCharacterEncoding()
@@ -271,7 +248,7 @@ public class RequestMessageDecoder
 
     public static int responseChannelId()
     {
-        return 4;
+        return 3;
     }
 
     public static String responseChannelCharacterEncoding()
