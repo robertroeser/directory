@@ -1,5 +1,6 @@
 package netflix.directory.client;
 
+import netflix.directory.core.protocol.GetEncoder;
 import netflix.directory.core.protocol.MessageHeaderDecoder;
 import netflix.directory.core.protocol.MessageHeaderEncoder;
 import netflix.directory.core.protocol.PutEncoder;
@@ -45,6 +46,7 @@ public class DirectoryAeronClient {
 
         final MessageHeaderEncoder messageHeaderEncoder = new MessageHeaderEncoder();
         final PutEncoder putEncoder = new PutEncoder();
+        final GetEncoder getEncoder = new GetEncoder();
 
         final UnsafeBuffer unsafeBuffer = new UnsafeBuffer(ByteBuffer.allocateDirect(MAX_BUFFER_LENGTH));
 
@@ -74,7 +76,7 @@ public class DirectoryAeronClient {
         Observable.interval(1, TimeUnit.SECONDS)
             .doOnNext(System.out::println)
             .doOnNext(i -> {
-                System.out.println("Sending message a_key" + i);
+                System.out.println("Sending put message a_key" + i);
 
                 messageHeaderEncoder.wrap(unsafeBuffer, 0, MESSAGE_TEMPLATE_VERSION);
                 putEncoder.wrap(unsafeBuffer, messageHeaderEncoder.size());
@@ -94,6 +96,29 @@ public class DirectoryAeronClient {
                 while (serverPublication.offer(unsafeBuffer, 0, length) < 0) {
 
                 }
+            })
+            .skip(3)
+            .doOnNext(i -> {
+                System.out.println("Sending get message with a_key" + i);
+
+                messageHeaderEncoder.wrap(unsafeBuffer, 0, MESSAGE_TEMPLATE_VERSION);
+                getEncoder.wrap(unsafeBuffer, messageHeaderEncoder.size());
+
+                messageHeaderEncoder
+                    .blockLength(GetEncoder.BLOCK_LENGTH)
+                    .templateId(GetEncoder.TEMPLATE_ID)
+                    .schemaId(GetEncoder.SCHEMA_ID)
+                    .version(GetEncoder.SCHEMA_VERSION);
+
+                getEncoder.responseChannel(RESPONSE_CHANNEL);
+                getEncoder.key("a_key" + i);
+
+                final int length = messageHeaderEncoder.size() + getEncoder.size();
+
+                while (serverPublication.offer(unsafeBuffer, 0, length) < 0) {
+
+                }
+
             })
             .toBlocking()
             .last();

@@ -11,6 +11,7 @@ import netflix.directory.core.protocol.ResponseEncoder;
 import rx.Observable;
 import rx.observables.GroupedObservable;
 import uk.co.real_logic.aeron.Aeron;
+import uk.co.real_logic.aeron.FragmentAssemblyAdapter;
 import uk.co.real_logic.aeron.Publication;
 import uk.co.real_logic.aeron.Subscription;
 import uk.co.real_logic.aeron.driver.MediaDriver;
@@ -75,6 +76,7 @@ public class DirectoryAeron {
                     .addSubscription(
                         DIRECTORY_SERVER_CHANNEL,
                         DIRECTORY_SERVER_STREAM_ID,
+                        new FragmentAssemblyAdapter(
                         (buffer, offset, length, header) -> {
                             messageHeaderDecoder.wrap(buffer, offset, MESSAGE_TEMPLATE_VERSION);
 
@@ -97,7 +99,6 @@ public class DirectoryAeron {
                                         hashFunction.hashString(putDecoder.key(), Charset.defaultCharset()).toString();
                                     String value = putDecoder.value();
 
-
                                     response = persister
                                         .put(Observable.just(hashedKey), Observable.just(value))
                                         .map(f -> {
@@ -116,7 +117,7 @@ public class DirectoryAeron {
                                                 .code(ResponseCode.SUCCESS)
                                                 .value("ok");
 
-                                            responseEncoder.key(hashedKey.toString());
+                                            responseEncoder.key(hashedKey);
 
                                             return responseEncoder;
                                         });
@@ -128,14 +129,19 @@ public class DirectoryAeron {
                                         messageHeaderDecoder.blockLength(),
                                         MESSAGE_TEMPLATE_VERSION);
 
+                                    responseChannel = getDecoder.responseChannel();
                                     hashedKey =
                                         hashFunction.hashString(getDecoder.key(), Charset.defaultCharset()).toString();
 
-                                    responseChannel = getDecoder.responseChannel();
-
                                     response = persister
-                                        .get(Observable.just(getDecoder.key()))
+                                        .get(Observable.just(hashedKey))
                                         .map(f -> {
+
+                                            System.out.println("Getting key = "
+                                                + hashedKey
+                                                + ", and returning value = "
+                                                + f);
+
                                             messageHeaderEncoder.wrap(responseBuffer, 0, MESSAGE_TEMPLATE_VERSION);
                                             responseEncoder.wrap(responseBuffer, messageHeaderEncoder.size());
 
@@ -149,7 +155,7 @@ public class DirectoryAeron {
                                                 .code(ResponseCode.SUCCESS)
                                                 .value(f);
 
-                                            responseEncoder.key(hashedKey.toString());
+                                            responseEncoder.key(hashedKey);
 
                                             return responseEncoder;
                                         });
@@ -160,28 +166,29 @@ public class DirectoryAeron {
                                     break;
                             }
 
-                            Observable<ResponseEncoder> responseEncoderObservable = Observable
-                                .just(GroupedObservable.from(responseChannel, response))
-                                .flatMap(go -> {
-                                    System.out.println(Thread.currentThread().getName() + "  Opening channel to " + go.getKey());
+                            Observable<ResponseEncoder> responseEncoderObservable =
+                                Observable
+                                    .just(GroupedObservable.from(responseChannel, response))
+                                    .flatMap(go -> {
+                                        System.out.println(Thread.currentThread().getName() + "  Opening channel to " + go.getKey());
 
-                                    Publication responsePublication = aeron.addPublication(go.getKey(), 1);
+                                        Publication responsePublication = aeron.addPublication(go.getKey(), 1);
 
-                                    return go
-                                        .doOnNext(r -> {
-                                            System.out.println(Thread.currentThread().getName() + "  Sending response to client");
+                                        return go
+                                            .doOnNext(r -> {
+                                                System.out.println(Thread.currentThread().getName() + "  Sending response to client");
 
-                                            final int l = messageHeaderEncoder.size() + r.size();
+                                                final int l = messageHeaderEncoder.size() + r.size();
 
-                                            while (responsePublication.offer(responseBuffer, 0, l) < 0) {
+                                                while (responsePublication.offer(responseBuffer, 0, l) < 0) {
 
-                                            }
+                                                }
 
-                                        });
-                                });
+                                            });
+                                    });
 
                             subscriber.onNext(responseEncoderObservable);
-                        });
+                        }));
 
             while (running) {
                 final int fragmentsRead = directoryServerSubscription.poll(Integer.MAX_VALUE);
