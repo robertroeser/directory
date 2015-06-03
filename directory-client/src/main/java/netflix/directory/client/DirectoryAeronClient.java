@@ -23,7 +23,7 @@ public class DirectoryAeronClient {
                     .flatMap(v ->
                         directoryClient
                             .get("a_key" + i)
-                            .doOnNext(s -> System.out.println("For key a_key " + i + " got value " + s))
+                            .doOnNext(s -> System.out.println("For key a_key" + i + " got value " + s))
                     )
             )
             .toBlocking()

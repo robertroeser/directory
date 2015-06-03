@@ -66,7 +66,7 @@ public class AeronChannelObservable implements AutoCloseable {
                                      final ConsumeDataHandler<T> handler,
                                      final Scheduler scheduler) {
 
-        Observable.create(subscriber -> {
+        return Observable.create(subscriber -> {
             uk.co.real_logic.aeron.Subscription subscription =
                 aeron.addSubscription(channel, streamId,
                     new FragmentAssemblyAdapter(
@@ -102,7 +102,6 @@ public class AeronChannelObservable implements AutoCloseable {
 
         });
 
-        return null;
     }
 
     public Observable<Void> publish(final String channel,

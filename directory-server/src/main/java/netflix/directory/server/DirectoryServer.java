@@ -56,7 +56,8 @@ public class DirectoryServer implements UuidUtils {
                     PUT_STREAM_ID,
                     new PutDataHandler(persister),
                     Schedulers.computation())
-                .flatMap(responseContextObservable -> publishToGroup(responseContextObservable, PUT_STREAM_ID));
+                .flatMap(responseContextObservable ->
+                    publishToGroup(responseContextObservable, PUT_STREAM_ID));
 
         Observable<Void> getObservable =
             aeronChannelObservable
@@ -64,7 +65,8 @@ public class DirectoryServer implements UuidUtils {
                     GET_STREAM_ID,
                     new GetDataHandler(persister),
                     Schedulers.computation())
-                .flatMap(responseContextObservable -> publishToGroup(responseContextObservable, GET_STREAM_ID));
+                .flatMap(responseContextObservable ->
+                    publishToGroup(responseContextObservable, GET_STREAM_ID));
 
         Observable<Void> deleteObservable =
             aeronChannelObservable
@@ -72,7 +74,8 @@ public class DirectoryServer implements UuidUtils {
                     DELETE_STREAM_ID,
                     new DeleteDataHandler(persister),
                     Schedulers.computation())
-                .flatMap(responseContextObservable -> publishToGroup(responseContextObservable, DELETE_STREAM_ID));
+                .flatMap(responseContextObservable ->
+                    publishToGroup(responseContextObservable, DELETE_STREAM_ID));
 
         Observable.merge(putObservable, getObservable, deleteObservable).toBlocking().last();
     }
