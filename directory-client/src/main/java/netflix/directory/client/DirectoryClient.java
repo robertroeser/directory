@@ -191,11 +191,17 @@ public class DirectoryClient {
     }
 
     protected DirectBuffer toPutRequest(RequestContext context) {
+
+        messageHeaderEncoder.wrap(requestBuffer, 0, 0);
+
         messageHeaderEncoder
             .blockLength(PutEncoder.BLOCK_LENGTH)
             .templateId(PutEncoder.TEMPLATE_ID)
             .schemaId(PutEncoder.SCHEMA_ID)
             .version(PutEncoder.SCHEMA_VERSION);
+
+
+        putEncoder.wrap(requestBuffer, messageHeaderEncoder.size());
 
         putEncoder.responseChannel(DIRECTORY_CLIENT_CHANNEL);
         putEncoder
@@ -207,18 +213,21 @@ public class DirectoryClient {
         putEncoder
             .transactionId().leastSignificationBits(context.getTransactionId().getLeastSignificantBits());
 
-        messageHeaderEncoder.wrap(requestBuffer, 0, 0);
-        putEncoder.wrap(requestBuffer, messageHeaderEncoder.size());
 
         return requestBuffer;
     }
 
     protected DirectBuffer toGetRequest(RequestContext context) {
+
+        messageHeaderEncoder.wrap(requestBuffer, 0, 0);
+
         messageHeaderEncoder
             .blockLength(GetEncoder.BLOCK_LENGTH)
             .templateId(GetEncoder.TEMPLATE_ID)
             .schemaId(GetEncoder.SCHEMA_ID)
             .version(GetEncoder.SCHEMA_VERSION);
+
+        getEncoder.wrap(requestBuffer, messageHeaderEncoder.size());
 
         getEncoder.responseChannel(DIRECTORY_CLIENT_CHANNEL);
         getEncoder
@@ -228,8 +237,7 @@ public class DirectoryClient {
         getEncoder
             .transactionId().leastSignificationBits(context.getTransactionId().getLeastSignificantBits());
 
-        messageHeaderEncoder.wrap(requestBuffer, 0, 0);
-        getEncoder.wrap(requestBuffer, messageHeaderEncoder.size());
+
 
         return requestBuffer;
     }

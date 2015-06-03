@@ -104,11 +104,15 @@ public class DirectoryServer implements UuidUtils {
     }
 
     public DirectBuffer map(ResponseContext context) {
+        messageHeaderEncoder.wrap(responseBuffer, 0, 0);
+
         messageHeaderEncoder
             .blockLength(ResponseEncoder.BLOCK_LENGTH)
             .templateId(ResponseEncoder.TEMPLATE_ID)
             .schemaId(ResponseEncoder.SCHEMA_ID)
             .version(ResponseEncoder.SCHEMA_VERSION);
+
+        responseEncoder.wrap(responseBuffer, messageHeaderEncoder.size());
 
         responseEncoder
             .key(context.getUnhashedKey());
@@ -126,9 +130,6 @@ public class DirectoryServer implements UuidUtils {
 
         responseEncoder.transactionId().mostSignificationBits(context.getTransactionId().getMostSignificantBits());
         responseEncoder.transactionId().leastSignificationBits(context.getTransactionId().getLeastSignificantBits());
-
-        messageHeaderEncoder.wrap(responseBuffer, 0, 0);
-        responseEncoder.wrap(responseBuffer, messageHeaderEncoder.size());
 
         return responseBuffer;
 
