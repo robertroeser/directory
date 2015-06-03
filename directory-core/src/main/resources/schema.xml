@@ -13,6 +13,14 @@
             <type name="schemaId" primitiveType="uint16"/>
             <type name="version" primitiveType="uint16"/>
         </composite>
+        <composite name="uuid">
+            <type name="mostSignificationBits" primitiveType="uint64"/>
+            <type name="leastSignificationBits" primitiveType="uint64"/>
+        </composite>
+        <composite name="varDataEncoding">
+            <type name="length" primitiveType="uint8" semanticType="Length"/>
+            <type name="varData" primitiveType="uint8" length="0" characterEncoding="UTF-8" semanticType="data"/>
+        </composite>
         <enum name="BooleanType" encodingType="uint8">
             <validValue name="FALSE">0</validValue>
             <validValue name="TRUE">1</validValue>
@@ -21,26 +29,29 @@
             <validValue name="SUCCESS">0</validValue>
             <validValue name="ERROR">1</validValue>
         </enum>
-        <composite name="varDataEncoding">
-            <type name="length" primitiveType="uint8" semanticType="Length"/>
-            <type name="varData" primitiveType="uint8" length="0" characterEncoding="UTF-8" semanticType="data"/>
-        </composite>
     </types>
     <sbe:message name="Response" id="1" description="Response message payload">
+        <field name="transactionId" id="4" type="uuid" />
         <field name="code" id="1" type="ResponseCode"/>
         <data name="key" id="2" type="varDataEncoding" />
         <data name="value" id="3" type="varDataEncoding" />
     </sbe:message>
+
     <sbe:message name="Put" id="2" description="Put message payload">
+        <field name="transactionId" id="4" type="uuid" />
         <data name="key" id="1" type="varDataEncoding" />
         <data name="value" id="2" type="varDataEncoding" />
         <data name="responseChannel" id="3" type="varDataEncoding" />
     </sbe:message>
+
     <sbe:message name="Get" id="3" description="Get message payload">
+        <field name="transactionId" id="3" type="uuid" />
         <data name="key" id="1" type="varDataEncoding" />
         <data name="responseChannel" id="2" type="varDataEncoding" />
     </sbe:message>
+
     <sbe:message name="Delete" id="4" description="Delete message payload">
+        <field name="transactionId" id="3" type="uuid" />
         <data name="key" id="1" type="varDataEncoding" />
         <data name="responseChannel" id="2" type="varDataEncoding" />
     </sbe:message>

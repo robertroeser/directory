@@ -6,7 +6,7 @@ import uk.co.real_logic.agrona.DirectBuffer;
 
 public class ResponseDecoder
 {
-    public static final int BLOCK_LENGTH = 1;
+    public static final int BLOCK_LENGTH = 17;
     public static final int TEMPLATE_ID = 1;
     public static final int SCHEMA_ID = 1;
     public static final int SCHEMA_VERSION = 0;
@@ -76,6 +76,31 @@ public class ResponseDecoder
         this.limit = limit;
     }
 
+    public static int transactionIdId()
+    {
+        return 4;
+    }
+
+    public static String transactionIdMetaAttribute(final MetaAttribute metaAttribute)
+    {
+        switch (metaAttribute)
+        {
+            case EPOCH: return "unix";
+            case TIME_UNIT: return "nanosecond";
+            case SEMANTIC_TYPE: return "";
+        }
+
+        return "";
+    }
+
+    private final UuidDecoder transactionId = new UuidDecoder();
+
+    public UuidDecoder transactionId()
+    {
+        transactionId.wrap(buffer, offset + 0, actingVersion);
+        return transactionId;
+    }
+
     public static int codeId()
     {
         return 1;
@@ -95,7 +120,7 @@ public class ResponseDecoder
 
     public ResponseCode code()
     {
-        return ResponseCode.get(CodecUtil.uint8Get(buffer, offset + 0));
+        return ResponseCode.get(CodecUtil.uint8Get(buffer, offset + 16));
     }
 
 

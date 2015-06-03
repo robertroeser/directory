@@ -6,7 +6,7 @@ import uk.co.real_logic.agrona.MutableDirectBuffer;
 
 public class DeleteEncoder
 {
-    public static final int BLOCK_LENGTH = 0;
+    public static final int BLOCK_LENGTH = 16;
     public static final int TEMPLATE_ID = 4;
     public static final int SCHEMA_ID = 1;
     public static final int SCHEMA_VERSION = 0;
@@ -70,6 +70,14 @@ public class DeleteEncoder
     {
         buffer.checkLimit(limit);
         this.limit = limit;
+    }
+
+    private final UuidEncoder transactionId = new UuidEncoder();
+
+    public UuidEncoder transactionId()
+    {
+        transactionId.wrap(buffer, offset + 0, actingVersion);
+        return transactionId;
     }
 
     public static int keyId()

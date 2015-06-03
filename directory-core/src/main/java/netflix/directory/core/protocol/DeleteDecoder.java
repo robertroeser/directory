@@ -6,7 +6,7 @@ import uk.co.real_logic.agrona.DirectBuffer;
 
 public class DeleteDecoder
 {
-    public static final int BLOCK_LENGTH = 0;
+    public static final int BLOCK_LENGTH = 16;
     public static final int TEMPLATE_ID = 4;
     public static final int SCHEMA_ID = 1;
     public static final int SCHEMA_VERSION = 0;
@@ -74,6 +74,31 @@ public class DeleteDecoder
     {
         buffer.checkLimit(limit);
         this.limit = limit;
+    }
+
+    public static int transactionIdId()
+    {
+        return 3;
+    }
+
+    public static String transactionIdMetaAttribute(final MetaAttribute metaAttribute)
+    {
+        switch (metaAttribute)
+        {
+            case EPOCH: return "unix";
+            case TIME_UNIT: return "nanosecond";
+            case SEMANTIC_TYPE: return "";
+        }
+
+        return "";
+    }
+
+    private final UuidDecoder transactionId = new UuidDecoder();
+
+    public UuidDecoder transactionId()
+    {
+        transactionId.wrap(buffer, offset + 0, actingVersion);
+        return transactionId;
     }
 
     public static int keyId()

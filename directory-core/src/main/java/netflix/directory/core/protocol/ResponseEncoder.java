@@ -6,7 +6,7 @@ import uk.co.real_logic.agrona.MutableDirectBuffer;
 
 public class ResponseEncoder
 {
-    public static final int BLOCK_LENGTH = 1;
+    public static final int BLOCK_LENGTH = 17;
     public static final int TEMPLATE_ID = 1;
     public static final int SCHEMA_ID = 1;
     public static final int SCHEMA_VERSION = 0;
@@ -71,9 +71,17 @@ public class ResponseEncoder
         buffer.checkLimit(limit);
         this.limit = limit;
     }
+
+    private final UuidEncoder transactionId = new UuidEncoder();
+
+    public UuidEncoder transactionId()
+    {
+        transactionId.wrap(buffer, offset + 0, actingVersion);
+        return transactionId;
+    }
     public ResponseEncoder code(final ResponseCode value)
     {
-        CodecUtil.uint8Put(buffer, offset + 0, value.value());
+        CodecUtil.uint8Put(buffer, offset + 16, value.value());
         return this;
     }
 
