@@ -15,7 +15,7 @@ public class DirectoryAeronClient {
         final DirectoryClient directoryClient = DirectoryClient.getInstance();
 
         Observable
-            .interval(1, TimeUnit.SECONDS)
+            .interval(5, TimeUnit.SECONDS)
             .flatMap(i ->
                 directoryClient
                     .put("a_key" + i, "some value " + i)

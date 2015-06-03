@@ -39,7 +39,8 @@ public class GetDataHandler extends PersisterDataHandler {
             .get(
                 Observable.just(hashedKey)
             )
-            .map(r -> new ResponseContext(responseChannel, unhashedKey, r, ResponseContext.ResponseCode.success, transactionId))
+            .map(r ->
+                new ResponseContext(responseChannel, unhashedKey, r, ResponseContext.ResponseCode.success, transactionId))
             .onErrorResumeNext(t ->
                 Observable.just(
                     new ResponseContext(responseChannel,

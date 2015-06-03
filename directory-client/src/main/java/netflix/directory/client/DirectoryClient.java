@@ -21,6 +21,7 @@ import uk.co.real_logic.agrona.concurrent.UnsafeBuffer;
 
 import java.nio.ByteBuffer;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
 /**
@@ -50,7 +51,7 @@ public class DirectoryClient {
     private final BehaviorSubject<RequestContext> putPublicationSubject;
     private final BehaviorSubject<RequestContext> getPublicationSubject;
 
-    private final ConcurrentSkipListMap<UUID, Subscriber<? super ResponseContext>> subscriberMap;
+    private final ConcurrentSkipListMap<String, Subscriber<? super ResponseContext>> subscriberMap;
 
     private final TimeBasedGenerator timeBasedGenerator;
 
@@ -80,7 +81,7 @@ public class DirectoryClient {
             .publish(
                 DIRECTORY_SERVER_CHANNEL,
                 GET_STREAM_ID,
-                putPublicationSubject
+                getPublicationSubject
                     .map(this::toGetRequest),
                 Schedulers.computation());
 
@@ -107,14 +108,17 @@ public class DirectoryClient {
     }
 
     public Observable<Void> put(String key, String value) {
+
         return Observable
             .<ResponseContext>create(subscriber -> {
                 final UUID transactionId = generateTransactionId();
 
-                subscriberMap.put(transactionId, subscriber);
+                System.out.println("Putting with transaction id " + transactionId);
+
+                subscriberMap.put(transactionId.toString(), subscriber);
                 putPublicationSubject.onNext(new RequestContext(key, value, transactionId));
             })
-            .doOnNext(r -> System.out.println("Put response = " + r.toString()))
+            .doOnNext(r -> System.out.println("Put response = " + r.toString() + " with transaction id " + r.getTransactionId()))
             .map(r -> null);
     }
 
@@ -123,10 +127,12 @@ public class DirectoryClient {
             .<ResponseContext>create(subscriber -> {
                 final UUID transactionId = generateTransactionId();
 
-                subscriberMap.put(transactionId, subscriber);
-                getPublicationSubject.onNext(new RequestContext(key, null, transactionId));
+                System.out.println("Getting with transaction id " + transactionId);
+
+                subscriberMap.put(transactionId.toString(), subscriber);
+                getPublicationSubject.onNext(new RequestContext(key, "", transactionId));
             })
-            .doOnNext(r -> System.out.println("Get response = " + r.toString()))
+            .doOnNext(r -> System.out.println("Get response = " + r.toString() + " with transaction id " + r.getTransactionId()))
             .map(r -> r.getResponse());
     }
 
@@ -168,8 +174,8 @@ public class DirectoryClient {
                 , Schedulers.computation())
             .doOnNext(r ->  System.out.println("Consuming a response from stream " + streamId + " = "  + r.toString()))
             .doOnNext(r -> {
-                Subscriber<? super ResponseContext> subscriber = subscriberMap.remove(r.getTransactionId());
-
+                Subscriber<? super ResponseContext> subscriber = subscriberMap.get(r.getTransactionId().toString());
+                int sid = streamId;
                 if (subscriber != null) {
                     if (r.getResponseCode() == ResponseContext.ResponseCode.success) {
                         subscriber.onNext(r);
@@ -179,6 +185,8 @@ public class DirectoryClient {
                     } else {
                         subscriber.onCompleted();
                     }
+
+                    subscriberMap.remove(r.getTransactionId().toString());
                 } else {
                     System.out.println("No subscriber found for transaction id " + r.getTransactionId());
                 }
@@ -236,7 +244,6 @@ public class DirectoryClient {
             .transactionId().mostSignificationBits(context.getTransactionId().getMostSignificantBits());
         getEncoder
             .transactionId().leastSignificationBits(context.getTransactionId().getLeastSignificantBits());
-
 
 
         return requestBuffer;
