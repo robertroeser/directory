@@ -12,6 +12,7 @@ import netflix.directory.server.aeron.PutDataHandler;
 import netflix.directory.core.ctx.ResponseContext;
 import rx.Observable;
 import rx.schedulers.Schedulers;
+import rx.subjects.BehaviorSubject;
 import uk.co.real_logic.agrona.DirectBuffer;
 import uk.co.real_logic.agrona.concurrent.UnsafeBuffer;
 
@@ -37,10 +38,18 @@ public class DirectoryServer implements UuidUtils {
 
     private final UnsafeBuffer responseBuffer = new UnsafeBuffer(ByteBuffer.allocateDirect(MAX_BUFFER_LENGTH));
 
+    private final BehaviorSubject<ResponseContext> putResponseSubject;
+    private final BehaviorSubject<ResponseContext> getResponseSubject;
+    private final BehaviorSubject<ResponseContext> deleteResponseSubject;
+
     public DirectoryServer() {
         this.mediaDriverHolder = MediaDriverHolder.getInstance();
         this.aeronChannelObservable = AeronChannelObservable.create();
         this.persister = new MapDBCachePersister(new NoopPersister(), 1_000_000);
+
+        this.putResponseSubject = BehaviorSubject.create();
+        this.getResponseSubject = BehaviorSubject.create();
+        this.deleteResponseSubject = BehaviorSubject.create();
     }
 
     public static void main(String... args) {
@@ -82,24 +91,14 @@ public class DirectoryServer implements UuidUtils {
 
     public Observable<Void> publishToGroup(Observable<ResponseContext> responseContextObservable, int streamId) {
         return responseContextObservable
-            .groupBy(keySelector -> keySelector.getResponseChannel())
+            .groupBy(ResponseContext::getResponseChannel)
             .flatMap(go ->
-                aeronChannelObservable.publish(go.getKey(), streamId,
-                    go
-                        .doOnSubscribe(() ->
-                            System.out.println("groupby has been subscribed for "
-                                + go.getKey()
-                                + ", streamId "
-                                + streamId))
-                        .doOnUnsubscribe(() ->
-                            System.out.println("groupby has been unsubscribed for "
-                                + go.getKey()
-                                + ", streamId "
-                                + streamId))
-                        .map(this::map),
-                    Schedulers.computation())
-                    .doOnError(Throwable::printStackTrace)
-                    .onErrorResumeNext(r -> Observable.empty())
+                    aeronChannelObservable.publish(go.getKey(), streamId,
+                        go.map(this::map),
+                        Schedulers.computation())
+                        .doOnError(Throwable::printStackTrace)
+                        .onErrorResumeNext(r -> Observable.empty())
+
             );
     }
 

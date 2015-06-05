@@ -3,6 +3,7 @@ package netflix.directory.client;
 import com.fasterxml.uuid.EthernetAddress;
 import com.fasterxml.uuid.Generators;
 import com.fasterxml.uuid.impl.TimeBasedGenerator;
+import com.google.common.util.concurrent.ListenableFuture;
 import netflix.directory.core.aeron.AeronChannelObservable;
 import netflix.directory.core.ctx.RequestContext;
 import netflix.directory.core.ctx.ResponseContext;
@@ -11,23 +12,35 @@ import netflix.directory.core.protocol.MessageHeaderDecoder;
 import netflix.directory.core.protocol.MessageHeaderEncoder;
 import netflix.directory.core.protocol.PutEncoder;
 import netflix.directory.core.protocol.ResponseDecoder;
+import netflix.directory.core.util.Loggable;
 import rx.Observable;
+import rx.Scheduler;
 import rx.Subscriber;
+import rx.functions.Action0;
+import rx.functions.Action1;
+import rx.observables.ConnectableObservable;
 import rx.schedulers.Schedulers;
-import rx.subjects.BehaviorSubject;
+import rx.subjects.AsyncSubject;
+import sun.plugin2.jvm.RemoteJVMLauncher;
 import uk.co.real_logic.aeron.common.concurrent.logbuffer.Header;
 import uk.co.real_logic.agrona.DirectBuffer;
 import uk.co.real_logic.agrona.concurrent.UnsafeBuffer;
 
+import javax.security.auth.callback.Callback;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Created by rroeser on 6/2/15.
  */
-public class DirectoryClient {
+public class DirectoryClient implements Loggable {
 
     public static final int MAX_BUFFER_LENGTH = 1024;
 
@@ -48,24 +61,34 @@ public class DirectoryClient {
     private final GetEncoder getEncoder = new GetEncoder();
     private final ResponseDecoder responseDecoder = new ResponseDecoder();
 
-    private final BehaviorSubject<RequestContext> putPublicationSubject;
-    private final BehaviorSubject<RequestContext> getPublicationSubject;
+    private final AsyncSubject<RequestContext> putPublicationSubject;
+    private final AsyncSubject<RequestContext> getPublicationSubject;
 
-    private final ConcurrentSkipListMap<String, Subscriber<? super ResponseContext>> subscriberMap;
+    private final ConcurrentSkipListMap<UUID, Subscriber<? super ResponseContext>> subscriberMap;
+
+    private final ConcurrentSkipListMap<UUID, AsyncSubject<? super ResponseContext>> subjectMap;
+
+
+    private final ConcurrentSkipListMap<UUID, Callback> callbackMap;
 
     private final TimeBasedGenerator timeBasedGenerator;
+
+    private AtomicLong lastRunCleanupTs = new AtomicLong();
 
     private final AeronChannelObservable aeronChannelObservable;
 
     private DirectoryClient() {
-        subscriberMap = new ConcurrentSkipListMap<>();
+        subscriberMap = new ConcurrentSkipListMap<>((o1, o2) ->  o2.compareTo(o1));
+        subjectMap = new ConcurrentSkipListMap<>((o1, o2) ->  o2.compareTo(o1));
+        callbackMap = new ConcurrentSkipListMap<>((o1, o2) ->  o2.compareTo(o1));
+
 
         timeBasedGenerator = Generators.timeBasedGenerator(EthernetAddress.fromInterface());
 
         aeronChannelObservable = AeronChannelObservable.create();
 
-        putPublicationSubject = BehaviorSubject.create();
-        getPublicationSubject = BehaviorSubject.create();
+        putPublicationSubject = AsyncSubject.create();
+        getPublicationSubject = AsyncSubject.create();
 
         Observable<Void> putPublish = aeronChannelObservable
             .publish(
@@ -87,6 +110,23 @@ public class DirectoryClient {
 
         Observable<Void> getConsume = doConsume(GET_STREAM_ID);
 
+        Scheduler.Worker worker = Schedulers.newThread().createWorker();
+        worker.schedulePeriodically(() -> {
+            List<UUID> timedOut = new ArrayList<>();
+
+            subscriberMap.forEach((uuid, ctx) -> {
+                long currentTs = System.currentTimeMillis();
+                lastRunCleanupTs.set(currentTs);
+
+                if (currentTs - uuid.timestamp() > TimeUnit.SECONDS.toMillis(2)) {
+                    timedOut.add(uuid);
+                }
+            });
+
+            timedOut.forEach(subscriberMap::remove);
+
+        }, 0, 100, TimeUnit.MILLISECONDS);
+
         Observable
             .merge(putPublish, putConsume, getPublish, getConsume)
             .subscribeOn(Schedulers.newThread())
@@ -107,33 +147,59 @@ public class DirectoryClient {
         }
     }
 
-    public Observable<Void> put(String key, String value) {
+    public Observable<Void> put(Observable<String> key, Observable<String> value) {
+        AsyncSubject<? super ResponseContext> asyncSubject = AsyncSubject.create();
 
-        return Observable
-            .<ResponseContext>create(subscriber -> {
+        Observable<DirectBuffer> buffer = key
+            .zipWith(value, (k, v) -> {
+
                 final UUID transactionId = generateTransactionId();
+                subjectMap.put(transactionId, asyncSubject);
 
-                System.out.println("Putting with transaction id " + transactionId);
+                DirectBuffer directBuffer = toPutRequest(new RequestContext(k, v, transactionId));
+                logger().debug("Putting with transaction id {} ", transactionId);
 
-                subscriberMap.put(transactionId.toString(), subscriber);
-                putPublicationSubject.onNext(new RequestContext(key, value, transactionId));
-            })
-            .doOnNext(r -> System.out.println("Put response = " + r.toString() + " with transaction id " + r.getTransactionId()))
-            .map(r -> null);
+                return directBuffer;
+            });
+
+        aeronChannelObservable
+            .publish(DIRECTORY_SERVER_CHANNEL, PUT_STREAM_ID, buffer, Schedulers.computation()).subscribe();
+
+        return asyncSubject
+                    .map(r -> null);
     }
 
-    public Observable<String> get(String key) {
-        return Observable
+    public Observable<String> get(Observable<String> key) {
+        AsyncSubject<? super ResponseContext> asyncSubject = AsyncSubject.create();
+
+        Observable<DirectBuffer> buffer = key
+            .map(k -> {
+                final UUID transactionId = generateTransactionId();
+                subjectMap.put(transactionId, asyncSubject);
+
+
+                DirectBuffer directBuffer = toGetRequest(new RequestContext(k, "", transactionId));
+                logger().debug("Getting with transaction id {} ", transactionId);
+                return directBuffer;
+            });
+
+         aeronChannelObservable
+            .publish(DIRECTORY_SERVER_CHANNEL, GET_STREAM_ID, buffer, Schedulers.computation()).subscribe();
+
+
+        return asyncSubject.map(r -> null);
+
+        /*return Observable
             .<ResponseContext>create(subscriber -> {
                 final UUID transactionId = generateTransactionId();
 
-                System.out.println("Getting with transaction id " + transactionId);
+                logger().debug("Getting with transaction id {}", transactionId);
 
-                subscriberMap.put(transactionId.toString(), subscriber);
+                subscriberMap.put(transactionId, subscriber);
                 getPublicationSubject.onNext(new RequestContext(key, "", transactionId));
             })
-            .doOnNext(r -> System.out.println("Get response = " + r.toString() + " with transaction id " + r.getTransactionId()))
-            .map(r -> r.getResponse());
+            .doOnNext(r -> logger().debug("Get response = {}  with transaction id {}", r.toString(), r.getTransactionId()))
+            .map(r -> r.getResponse());*/
     }
 
     protected Observable<Void> doConsume(int streamId) {
@@ -172,10 +238,26 @@ public class DirectoryClient {
                     }
                 }
                 , Schedulers.computation())
-            .doOnNext(r ->  System.out.println("Consuming a response from stream " + streamId + " = "  + r.toString()))
+            .doOnNext(r -> logger().debug("Consuming a response from stream {} = {}", streamId, r.toString()))
             .doOnNext(r -> {
-                Subscriber<? super ResponseContext> subscriber = subscriberMap.get(r.getTransactionId().toString());
-                int sid = streamId;
+                AsyncSubject<? super ResponseContext> asyncSubject = subjectMap.get(r.getTransactionId());
+                if (asyncSubject != null) {
+                    if (r.getResponseCode() == ResponseContext.ResponseCode.success) {
+                        asyncSubject.onNext(r);
+                        asyncSubject.onCompleted();
+                    } else if (r.getResponseCode() == ResponseContext.ResponseCode.error) {
+                        asyncSubject.onError(new RuntimeException(r.getResponse()));
+                    } else {
+                        asyncSubject.onCompleted();
+                    }
+
+                    subscriberMap.remove(r.getTransactionId());
+                } else {
+                    logger().debug("No subscriber found for transaction id {}", r.getTransactionId());
+                }
+/*
+
+                Subscriber<? super ResponseContext> subscriber = subscriberMap.get(r.getTransactionId());
                 if (subscriber != null) {
                     if (r.getResponseCode() == ResponseContext.ResponseCode.success) {
                         subscriber.onNext(r);
@@ -186,10 +268,11 @@ public class DirectoryClient {
                         subscriber.onCompleted();
                     }
 
-                    subscriberMap.remove(r.getTransactionId().toString());
+                    subscriberMap.remove(r.getTransactionId());
                 } else {
-                    System.out.println("No subscriber found for transaction id " + r.getTransactionId());
+                    logger().debug("No subscriber found for transaction id {}", r.getTransactionId());
                 }
+                 */
             })
             .map(r -> null);
     }

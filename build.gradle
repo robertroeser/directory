@@ -13,6 +13,12 @@ buildscript {
 }
 
 allprojects {
+
+    configurations {
+        all*.exclude group: 'log4j', module: 'log4j'
+    }
+
+
     apply plugin: 'nebula'
     apply plugin: 'nebula-ospackage'
     apply plugin: 'application'
@@ -34,6 +40,7 @@ allprojects {
 
 }
 
+
 subprojects {
 
     dependencies {
@@ -49,6 +56,12 @@ project (':directory-core') {
         compile 'uk.co.real-logic:aeron-client:0.1-SNAPSHOT'
         compile 'uk.co.real-logic:aeron-driver:0.1-SNAPSHOT'
         compile 'uk.co.real-logic:aeron-tools:0.1-SNAPSHOT'
+
+        compile 'org.apache.logging.log4j:log4j-core:2.3'
+        compile 'org.apache.logging.log4j:log4j-api:2.3'
+        compile 'org.apache.logging.log4j:log4j-slf4j-impl:2.3'
+        compile 'org.apache.logging.log4j:log4j-1.2-api:2.3'
+
     }
 
     // ./gradlew generateStubs
@@ -89,6 +102,7 @@ project (':directory-client') {
         compile project (':directory-core')
         compile 'io.reactivex:rxjava:1.0.8'
         compile 'io.reactivex:rxnetty:0.4.9'
+        compile 'com.google.guava:guava:18.0'
         compile 'uk.co.real-logic:aeron-client:0.1-SNAPSHOT'
         compile 'uk.co.real-logic:aeron-driver:0.1-SNAPSHOT'
         compile 'uk.co.real-logic:aeron-tools:0.1-SNAPSHOT'

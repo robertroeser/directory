@@ -21,6 +21,12 @@
             <type name="length" primitiveType="uint8" semanticType="Length"/>
             <type name="varData" primitiveType="uint8" length="0" characterEncoding="UTF-8" semanticType="data"/>
         </composite>
+
+        <composite name="binDataEncoding">
+            <type name="length" primitiveType="uint8" semanticType="Length"/>
+            <type name="varData" primitiveType="uint8" length="0" semanticType="data"/>
+        </composite>
+
         <enum name="BooleanType" encodingType="uint8">
             <validValue name="FALSE">0</validValue>
             <validValue name="TRUE">1</validValue>
@@ -54,5 +60,24 @@
         <field name="transactionId" id="3" type="uuid" />
         <data name="key" id="1" type="varDataEncoding" />
         <data name="responseChannel" id="2" type="varDataEncoding" />
+    </sbe:message>
+
+    <sbe:message name="Connection" id="5" description="connections">
+        <data name="clientChannel" id="1" type="varDataEncoding" />
+    </sbe:message>
+
+    <sbe:message name="ConnectionAck" id="6" description="connection" >
+        <field name="connectionId" id="1" type="uint64"/>
+    </sbe:message>
+
+    <sbe:message name="Payload" id="7" description="payload">
+        <field name="connectionId" id="1" type="uint64"/>
+        <field name="transactionId" id="2" type="uint64" />
+        <data name="binDataEncoding" id="3" type="varDataEncoding" />
+    </sbe:message>
+
+    <sbe:message name="PayloadResponce" id="8" description="payload">
+        <field name="transactionId" id="1" type="uint64" />
+        <data name="binDataEncoding" id="2" type="varDataEncoding" />
     </sbe:message>
 </sbe:messageSchema>
